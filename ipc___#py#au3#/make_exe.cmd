@@ -1,0 +1,1 @@
+pyinstaller -F --exclude-module PyQt5 -n ipc-py.exe ipc.py
