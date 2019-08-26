@@ -1,5 +1,5 @@
-exe:
-	PyInstaller main\main.py
+wheel:
+	python setup.py bdist_wheel --universal
 
 clean:
-	rd /s /q build dist
+	rd /s /q __pycache__ build dist pkgtree.egg-info

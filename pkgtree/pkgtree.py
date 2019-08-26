@@ -23,11 +23,19 @@ A B D E F I J K
 
 > uninstall B C
 B C F G H
+
+-----------------------------------
+You may uninstall packages and dependencies like this (on windows cmd):
+
+> for /F %a in ('pkgtree PACKAGE1 PACKAGE2 -ub') do @pip uninstall -y %a
+
 '''
 
 import sys
 import argparse
 import pkg_resources
+
+__version__ = '0.4'
 
 _installed = set()
 _tops = set()  # {'setuptools', 'pip'}  # Installed with Python.
@@ -53,16 +61,16 @@ def _init():
     _tops |= (_installed - _depended)
 
 
-def _print_package_info(pkg, level, specs, bare, verbose, ispreserved):
+def _print_package_info(pkg, level, specs, bare, verbose, ispreserved, ismissed):
     infos = ['  '*level, pkg.project_name]
     if not bare:
-        infos.append(' [PRESERVED]' if ispreserved else '')
         infos.append(' == ' + pkg.version)
-    if verbose:
-        infos.append(' [{}]'.format(
-            ','.join([op+ver for op, ver in specs]) if len(specs) else '*'))
-    else:
-        infos.append('[*]' if verbose else '')
+        if verbose:
+            infos.append(' [{}]'.format(
+                ','.join([op+ver for op, ver in specs]) if len(specs) else '*'))
+        infos.append(' [PRESERVED]' if ispreserved else '')
+        infos.append(' [MISSED]' if ismissed else '')
+
     print(''.join(infos))
 
 
@@ -71,24 +79,25 @@ class _DummyPkg():
 
 
 def _print_package_info_recurse(key, args, level, specs):
-    ispreserved = key in args.preserved
+    ispreserved = (args.preserved and key in args.preserved)
     ismissed = key not in _packages
-    # "uninstall" mode, "preserved" package won't be printed with `-b/--bare` option
-    if args.uninstall and (args.preserved and ispreserved or ismissed) and args.bare:
+    # When using "-u/--uninstall" with "-b/--bare" option,
+    # "missed" or "preserved" packages won't be printed
+    if args.uninstall and (ispreserved or ismissed) and args.bare:
         return
 
     if not ismissed:
         pkg = _packages[key]
         _print_package_info(pkg, level, specs, args.bare,
-                            args.verbose, ispreserved)
+                            args.verbose, ispreserved, ismissed)
         for dep in pkg.requires():
             _print_package_info_recurse(dep.key, args, level+1, dep.specs)
     else:
         pkg = _DummyPkg()
-        pkg.project_name = key + ' [MISSED]'
-        pkg.version = ''
+        pkg.project_name = key
+        pkg.version = '0'
         _print_package_info(pkg, level, specs, args.bare,
-                            args.verbose, ispreserved)
+                            args.verbose, ispreserved, ismissed)
 
 
 def list_packages(keys, args):
